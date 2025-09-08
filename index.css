@@ -1038,6 +1038,7 @@ main {
     outline: none;
     padding: 0.75rem 0.5rem;
     font-size: 0.95rem;
+    min-width: 0; /* Prevents input from overflowing flex container */
 }
 .website-builder-input-wrapper .recording-indicator {
     padding: 0;

@@ -4,6 +4,23 @@ import { createRoot } from 'react-dom/client';
 import { GoogleGenAI, Chat, Modality, Type } from '@google/genai';
 
 // --- Helper Functions & SVGs ---
+const getGeminiErrorText = (err: unknown): string => {
+    if (err instanceof Error) {
+        const message = err.message?.toLowerCase() || '';
+        if (message.includes('api key not valid') || message.includes('permission_denied')) {
+            return 'API Key Error: Your API key appears to be invalid or missing permissions. Please check your configuration.';
+        }
+        if (message.includes('400') || message.includes('500') || message.includes('http status code: 0') || message.includes('rpc failed')) {
+            return 'Network Error: Could not connect to the AI service. This may be due to an invalid API key, a network problem, or a temporary service outage. Please check your connection and API key, then try again.';
+        }
+        if (message.includes("did not return an upscaled image")) {
+            return "The AI did not return an upscaled image. This can happen if the request is refused for safety reasons.";
+        }
+        return 'An unexpected error occurred. Please try again.';
+    }
+    return 'An unknown error occurred. Please try again.';
+};
+
 const Icon = ({ path, className = '' }) => (
     <svg className={className} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d={path} fill="currentColor" />
@@ -474,10 +491,7 @@ const BuildWebsiteView = ({ initialData, onSave }) => {
             setIsAwaitingConfirmation(true);
         } catch (err) {
             console.error("Website Analysis Error:", err);
-            let errorMessage = "Sorry, I couldn't process that request. Please try again.";
-            if (err instanceof Error && (err.message.includes('PERMISSION_DENIED') || err.message.includes('API key not valid'))) {
-                errorMessage = "There seems to be an issue with the API key. Please ensure it's configured correctly and has the necessary permissions.";
-            }
+            const errorMessage = getGeminiErrorText(err);
             setAndClearError(errorMessage);
             setChatMessages(prev => prev.slice(0, -1));
         } finally {
@@ -539,12 +553,9 @@ The user's request is: "${userMessageText}".
 
         } catch (err) {
             console.error("Website Modification Error:", err);
-            let errorMessage = "An error occurred while modifying the code. Please try again.";
-             if (err instanceof Error && (err.message.includes('PERMISSION_DENIED') || err.message.includes('API key not valid'))) {
-                errorMessage = "API Key Error: Could not modify the website. Please check your key configuration.";
-            }
+            const errorMessage = getGeminiErrorText(err);
             setAndClearError(errorMessage);
-            setChatMessages(prev => [...prev, { role: 'model', text: "Sorry, I couldn't make that change." }]);
+            setChatMessages(prev => [...prev, { role: 'model', text: "Sorry, I couldn't make that change due to an error." }]);
         } finally {
             setIsLoading(false);
         }
@@ -600,11 +611,9 @@ The user's request is: "${userMessageText}".
 
         } catch (err) {
             console.error("Website Generation Error:", err);
-            let errorMessage = "An error occurred while generating the code. Please try again.";
-             if (err instanceof Error && (err.message.includes('PERMISSION_DENIED') || err.message.includes('API key not valid'))) {
-                errorMessage = 'There is an issue with your API key. Please ensure it is configured correctly.';
-            }
+            const errorMessage = getGeminiErrorText(err);
             setAndClearError(errorMessage);
+            setChatMessages(prev => [...prev, { role: 'model', text: "I'm sorry, I failed to generate the website. Please check the error message and try again." }]);
             setGenerationProgress(null);
             setIsLoading(false);
         }
@@ -930,16 +939,7 @@ const ImageUpscalingView = () => {
 
         } catch (err) {
             console.error("Image Upscaling Error:", err);
-            let errorMessage = "An error occurred while upscaling the image.";
-            if (err instanceof Error) {
-                if (err.message.includes('PERMISSION_DENIED') || err.message.includes('API key not valid')) {
-                    errorMessage = 'There seems to be an issue with your API key. Please check its configuration and permissions.';
-                } else if (err.message.includes("did not return an upscaled image")) {
-                    errorMessage = "The AI did not return an upscaled image. It might have refused the request due to safety policies.";
-                } else if (err.message) {
-                    errorMessage = `An error occurred: ${err.message}`;
-                }
-            }
+            const errorMessage = getGeminiErrorText(err);
             setError(errorMessage);
         } finally {
             setIsLoading(false);
@@ -1471,14 +1471,7 @@ const ChatView = () => {
             }
         } catch (err) {
             console.error('Gemini API Error:', err);
-            let errorMessage = 'Sorry, something went wrong. Please try again.';
-            if (err instanceof Error) {
-                if (err.message.includes('API key not valid') || err.message.includes('PERMISSION_DENIED')) {
-                    errorMessage = 'Your API key appears to be invalid or missing permissions. Please check your configuration.';
-                } else if (err.message.includes('400') || err.message.includes('500') || err.message.includes('http status code: 0')) {
-                    errorMessage = 'Network issue: Could not connect to the AI. This may be due to an invalid API key or a network problem.';
-                }
-            }
+            const errorMessage = getGeminiErrorText(err);
             setAndClearError(errorMessage);
             setMessages(prev => prev.slice(0, -1)); // Remove placeholder
         } finally {
@@ -1545,9 +1538,13 @@ const ChatView = () => {
                     messages.map((msg, index) => (
                         <div key={index} className={`message-container ${msg.role}`}>
                             <div className="message-content-wrapper">
-                                <div className="message-bubble">
-                                    <p>{msg.text}</p>
-                                    {isLoading && msg.role === 'model' && index === messages.length - 1 && <span className="typing-cursor">|</span>}
+                                <div className={`message-bubble ${isLoading && msg.role === 'model' && index === messages.length - 1 && !msg.text ? 'loading-bubble' : ''}`}>
+                                    {isLoading && msg.role === 'model' && index === messages.length - 1 && !msg.text ? (
+                                        <div className="loader-small"></div>
+                                    ) : (
+                                        <p>{msg.text}</p>
+                                    )}
+                                    {isLoading && msg.role === 'model' && index === messages.length - 1 && !!msg.text && <span className="typing-cursor">|</span>}
                                 </div>
                                 <div className="message-meta">
                                     <span className="timestamp">{msg.timestamp.toLocaleTimeString()}</span>
