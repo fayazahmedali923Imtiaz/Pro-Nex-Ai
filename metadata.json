@@ -1,5 +1,7 @@
 {
-  "name": "Pro Nex AI",
-  "description": "A sophisticated AI chatbot SaaS application with user authentication, a futuristic UI, and a full-featured chat interface.",
-  "requestFramePermissions": []
+  "name": "Pro Nex Ai ",
+  "description": "An AI chatbot that can generate text, images, and videos.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }
